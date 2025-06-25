@@ -26,7 +26,7 @@ export default function TrackSearch() {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} className="text-sm font-[family-name:var(--font-geist-mono)]">
       <input
         value={input}
         onChange={(e) => setInput(e.target.value)}
