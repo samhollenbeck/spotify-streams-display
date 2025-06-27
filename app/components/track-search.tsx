@@ -3,9 +3,11 @@
 import { useState, useEffect, useRef } from "react";
 import "@fontsource/dm-sans/400.css"; // normal
 import "@fontsource/dm-sans/700.css"; // bold
+import ColorThief from "colorthief";
 
 export default function TrackSearch() {
   const [input, setInput] = useState("");
+  const [streams, setStreams] = useState("");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -49,11 +51,24 @@ export default function TrackSearch() {
       canvas.width = 1080;
       canvas.height = 1920;
 
-      // 🎨 Gradient background
-      const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-      gradient.addColorStop(0, "#1f1f1f");
-      gradient.addColorStop(1, "#101010");
-      ctx.fillStyle = gradient;
+      // Custom background
+      const colorThief = new ColorThief();
+      const palette = colorThief.getPalette(image, 10);
+
+      let bgColor: number[] = [18, 18, 18]; // fallback dark gray
+
+      if (palette) {
+        bgColor = palette[0];
+      }
+
+      const [r, g, b] = bgColor;
+      ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const overlay = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      overlay.addColorStop(0, "rgba(0,0,0,0.0)");
+      overlay.addColorStop(1, "rgba(0,0,0,0.3)");
+      ctx.fillStyle = overlay;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       // 🎵 Album cover
@@ -62,6 +77,47 @@ export default function TrackSearch() {
       const coverY = 80;
       const radius = 40;
 
+      // ✨ Draw drop shadow
+      const shadowOffset = 12;
+      const shadowBlur = 20;
+
+      ctx.save();
+      ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
+      ctx.shadowOffsetX = shadowOffset;
+      ctx.shadowOffsetY = shadowOffset;
+      ctx.shadowBlur = shadowBlur;
+
+      ctx.beginPath();
+      ctx.moveTo(coverX + radius, coverY);
+      ctx.lineTo(coverX + coverSize - radius, coverY);
+      ctx.quadraticCurveTo(
+        coverX + coverSize,
+        coverY,
+        coverX + coverSize,
+        coverY + radius,
+      );
+      ctx.lineTo(coverX + coverSize, coverY + coverSize - radius);
+      ctx.quadraticCurveTo(
+        coverX + coverSize,
+        coverY + coverSize,
+        coverX + coverSize - radius,
+        coverY + coverSize,
+      );
+      ctx.lineTo(coverX + radius, coverY + coverSize);
+      ctx.quadraticCurveTo(
+        coverX,
+        coverY + coverSize,
+        coverX,
+        coverY + coverSize - radius,
+      );
+      ctx.lineTo(coverX, coverY + radius);
+      ctx.quadraticCurveTo(coverX, coverY, coverX + radius, coverY);
+      ctx.closePath();
+      ctx.fillStyle = "rgba(0, 0, 0, 0.4)"; // Just a filler to trigger shadow
+      ctx.fill();
+      ctx.restore();
+
+      // Draw album cover image with rounded corners
       ctx.save();
       ctx.beginPath();
       ctx.moveTo(coverX + radius, coverY);
@@ -94,7 +150,7 @@ export default function TrackSearch() {
       ctx.restore();
 
       document.fonts.ready.then(() => {
-        // 🧑‍🎤 Format Artist Names
+        // Format Artist Names
         const artistNames = result.artists.map((a: Artist) => a.name);
         const formattedArtists =
           artistNames.length > 2
@@ -103,9 +159,22 @@ export default function TrackSearch() {
               artistNames.slice(-1)
             : artistNames.join(" and ");
 
-        const message = `${formattedArtists} just passed 5000 streams on their song, "${result.name}".`;
+        function formatStreams(streams: string): string {
+          const s = Number(streams);
+          if (s >= 1_000_000_000) {
+            return `${(s / 1_000_000_000).toFixed(2).replace(/\.00$/, "")} billion`;
+          } else if (s >= 1_000_000) {
+            return `${(s / 1_000_000).toFixed(2).replace(/\.00$/, "")} million`;
+          } else if (s >= 10_000) {
+            return `${(s / 1_000).toFixed(1).replace(/\.0$/, "")}k`;
+          } else {
+            return streams; // e.g. 9,000
+          }
+        }
 
-        // ✍️ Font and wrapping
+        const message = `${formattedArtists} just passed ${formatStreams(streams)} streams on their song, "${result.name}".`;
+
+        // Font and wrapping
         ctx.fillStyle = "white";
         ctx.textAlign = "left";
         ctx.textBaseline = "top";
@@ -129,7 +198,7 @@ export default function TrackSearch() {
         }
         lines.push(currentLine.trim());
 
-        // 🧭 Draw lines (left aligned, top padding)
+        // Draw lines (left aligned, top padding)
         const lineHeight = 80;
         const startY = coverY + coverSize + 80; // vertical padding from top
 
@@ -138,7 +207,7 @@ export default function TrackSearch() {
         });
       });
 
-      // 🟩 Spotify logo (load and draw)
+      // Spotify logo (load and draw)
       const spotifyLogo = new Image();
       spotifyLogo.src = "/spotify.png";
       spotifyLogo.onload = () => {
@@ -150,7 +219,7 @@ export default function TrackSearch() {
         ctx.drawImage(spotifyLogo, logoX, logoY, logoWidth, logoHeight);
       };
     };
-  }, [result]);
+  }, [result, streams]);
 
   function downloadCanvas() {
     const canvas = canvasRef.current;
@@ -172,6 +241,14 @@ export default function TrackSearch() {
         onChange={(e) => setInput(e.target.value)}
         placeholder="Track URL or ID"
         className="p-2 border border-gray-300 rounded"
+      />
+
+      <input
+        type="number"
+        value={streams}
+        onChange={(e) => setStreams(e.target.value)}
+        placeholder="Streams"
+        className="p-2 border border-gray-300 rounded ml-2 w-28"
       />
       <button
         type="submit"
